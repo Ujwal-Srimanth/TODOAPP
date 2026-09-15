@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 
 const STORAGE_KEY = 'daily-tracker-v1';
@@ -81,7 +81,7 @@ function App() {
     setRecords(nextRecords);
   };
 
-  const loadRecordsFromApi = async () => {
+  const loadRecordsFromApi = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/records`);
       if (!response.ok) throw new Error('Failed to fetch records');
@@ -92,9 +92,9 @@ function App() {
     } catch (error) {
       console.warn('Falling back to browser storage for records:', error.message);
     }
-  };
+  }, []);
 
-  const loadCustomEventsFromApi = async () => {
+  const loadCustomEventsFromApi = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/custom-events`);
       if (!response.ok) throw new Error('Failed to fetch custom events');
@@ -104,12 +104,12 @@ function App() {
       console.warn('Falling back to browser storage for custom events:', error.message);
       setCustomEvents([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadRecordsFromApi();
     loadCustomEventsFromApi();
-  }, []);
+  }, [loadRecordsFromApi, loadCustomEventsFromApi]);
 
   useEffect(() => {
     setRecords([]);
@@ -123,8 +123,8 @@ function App() {
     }
   }, []);
 
-  const safeCustomEvents = Array.isArray(customEvents) ? customEvents : [];
-  const safeRecords = Array.isArray(records) ? records : [];
+  const safeCustomEvents = useMemo(() => (Array.isArray(customEvents) ? customEvents : []), [customEvents]);
+  const safeRecords = useMemo(() => (Array.isArray(records) ? records : []), [records]);
 
   const allEvents = useMemo(
     () => [...DEFAULT_EVENTS, ...safeCustomEvents].filter((event) => eventMatchesRecurrence(event, selectedDate)),
