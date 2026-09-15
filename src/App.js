@@ -109,40 +109,46 @@ function App() {
   const [expenseTags, setExpenseTags] = useState(DEFAULT_EXPENSE_TAGS);
   const [records, setRecords] = useState([]);
   const [draftEntries, setDraftEntries] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
 
   const syncLocalRecords = (nextRecords) => {
     setRecords(nextRecords);
   };
 
-  const loadRecordsFromApi = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/records`);
-      if (!response.ok) throw new Error('Failed to fetch records');
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        syncLocalRecords(normalizeRecordList(data));
-      }
-    } catch (error) {
-      console.warn('Falling back to browser storage for records:', error.message);
-    }
-  }, []);
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true);
 
-  const loadCustomEventsFromApi = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/custom-events`);
-      if (!response.ok) throw new Error('Failed to fetch custom events');
-      const data = await response.json();
-      setCustomEvents(Array.isArray(data) ? data : []);
+      const [recordsResponse, customEventsResponse] = await Promise.all([
+        fetch(`${API_BASE}/records`),
+        fetch(`${API_BASE}/custom-events`),
+      ]);
+
+      if (!recordsResponse.ok) {
+        throw new Error('Failed to fetch records');
+      }
+
+      if (!customEventsResponse.ok) {
+        throw new Error('Failed to fetch custom events');
+      }
+
+      const recordsData = await recordsResponse.json();
+      const customEventsData = await customEventsResponse.json();
+
+      syncLocalRecords(Array.isArray(recordsData) ? normalizeRecordList(recordsData) : []);
+      setCustomEvents(Array.isArray(customEventsData) ? customEventsData : []);
     } catch (error) {
-      console.warn('Falling back to browser storage for custom events:', error.message);
+      console.warn('Falling back to browser storage for tracker data:', error.message);
+      setRecords([]);
       setCustomEvents([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadRecordsFromApi();
-    loadCustomEventsFromApi();
-  }, [loadRecordsFromApi, loadCustomEventsFromApi]);
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   useEffect(() => {
     setRecords([]);
@@ -662,6 +668,17 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
       />
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="app-shell">
+        <div className="loading-panel">
+          <div className="loading-spinner" aria-label="Loading tracker data" />
+          <p>Loading your tracker data…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
