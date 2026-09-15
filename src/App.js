@@ -108,6 +108,7 @@ function App() {
   const [customEvents, setCustomEvents] = useState([]);
   const [expenseTags, setExpenseTags] = useState(DEFAULT_EXPENSE_TAGS);
   const [records, setRecords] = useState([]);
+  const [expenseDocs, setExpenseDocs] = useState([]);
   const [draftEntries, setDraftEntries] = useState({});
   const [isLoading, setIsLoading] = useState(true);
 
@@ -119,9 +120,10 @@ function App() {
     setIsLoading(true);
 
     try {
-      const [recordsResponse, customEventsResponse] = await Promise.all([
+      const [recordsResponse, customEventsResponse, expenseResponse] = await Promise.all([
         fetch(`${API_BASE}/records`),
         fetch(`${API_BASE}/custom-events`),
+        fetch(`${API_BASE}/expenses`),
       ]);
 
       if (!recordsResponse.ok) {
@@ -132,15 +134,22 @@ function App() {
         throw new Error('Failed to fetch custom events');
       }
 
+      if (!expenseResponse.ok) {
+        throw new Error('Failed to fetch expenses');
+      }
+
       const recordsData = await recordsResponse.json();
       const customEventsData = await customEventsResponse.json();
+      const expenseData = await expenseResponse.json();
 
       syncLocalRecords(Array.isArray(recordsData) ? normalizeRecordList(recordsData) : []);
       setCustomEvents(Array.isArray(customEventsData) ? customEventsData : []);
+      setExpenseDocs(Array.isArray(expenseData) ? expenseData : []);
     } catch (error) {
       console.warn('Falling back to browser storage for tracker data:', error.message);
       setRecords([]);
       setCustomEvents([]);
+      setExpenseDocs([]);
     } finally {
       setIsLoading(false);
     }
@@ -164,6 +173,7 @@ function App() {
 
   const safeCustomEvents = useMemo(() => (Array.isArray(customEvents) ? customEvents : []), [customEvents]);
   const safeRecords = useMemo(() => (Array.isArray(records) ? records : []), [records]);
+  const safeExpenseDocs = useMemo(() => (Array.isArray(expenseDocs) ? expenseDocs : []), [expenseDocs]);
 
   const allEvents = useMemo(
     () => [...DEFAULT_EVENTS, ...safeCustomEvents].filter((event) => eventMatchesRecurrence(event, selectedDate)),
@@ -391,36 +401,61 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
     );
   };
 
-  const totalExpense = monthRecords.reduce((sum, record) => {
-    const expenseValues = Object.values(record.entries).filter(isExpenseEntry);
-    return (
-      sum +
-      expenseValues.reduce((innerSum, entry) => innerSum + (Number(entry.value) || 0), 0)
-    );
-  }, 0);
+  const totalExpense = useMemo(() => {
+    const fromRecords = monthRecords.reduce((sum, record) => {
+      const expenseValues = Object.values(record.entries).filter(isExpenseEntry);
+      return (
+        sum +
+        expenseValues.reduce((innerSum, entry) => innerSum + (Number(entry.value) || 0), 0)
+      );
+    }, 0);
+
+    const fromExpenseDocs = safeExpenseDocs
+      .filter((expense) => expense && expense.date && expense.date.startsWith(selectedMonth))
+      .reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+
+    return fromExpenseDocs || fromRecords;
+  }, [monthRecords, safeExpenseDocs, selectedMonth]);
 
   const expenseByTag = useMemo(() => {
     const map = new Map();
 
-    monthRecords.forEach((record) => {
-      Object.values(record.entries)
-        .filter(isExpenseEntry)
-        .forEach((entry) => {
-          const tag = displayExpenseTag(entry.tag || 'Others');
-          const key = canonicalExpenseTag(tag);
+    safeExpenseDocs
+      .filter((expense) => expense && expense.date && expense.date.startsWith(selectedMonth))
+      .forEach((expense) => {
+        const tag = displayExpenseTag(expense.tag || 'Others');
+        const key = canonicalExpenseTag(tag);
 
-          if (!map.has(key)) {
-            map.set(key, { label: tag, total: 0 });
-          }
+        if (!map.has(key)) {
+          map.set(key, { label: tag, total: 0 });
+        }
 
-          const current = map.get(key);
-          current.total += Number(entry.value || 0);
-          map.set(key, current);
-        });
-    });
+        const current = map.get(key);
+        current.total += Number(expense.amount || 0);
+        map.set(key, current);
+      });
+
+    if (!map.size) {
+      monthRecords.forEach((record) => {
+        Object.values(record.entries)
+          .filter(isExpenseEntry)
+          .forEach((entry) => {
+            const tag = displayExpenseTag(entry.tag || 'Others');
+            const key = canonicalExpenseTag(tag);
+
+            if (!map.has(key)) {
+              map.set(key, { label: tag, total: 0 });
+            }
+
+            const current = map.get(key);
+            current.total += Number(entry.value || 0);
+            map.set(key, current);
+          });
+      });
+    }
 
     return [...map.values()].sort((a, b) => b.total - a.total).map((item) => [item.label, item.total]);
-  }, [monthRecords]);
+  }, [monthRecords, safeExpenseDocs, selectedMonth]);
 
   const budgetLimit = 15000;
   const monthlyExpenseStatus = (() => {
@@ -882,13 +917,40 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
 
             <div className="history-list">
               {(() => {
-                const selectedDayRecord = safeRecords.find((record) => record.date === expenseDate);
-                const expenseEntryList = selectedDayRecord
-                  ? Object.values(selectedDayRecord.entries).filter(isExpenseEntry)
-                  : [];
+                const expenseEntryList = safeExpenseDocs
+                  .filter((expense) => expense && expense.date === expenseDate)
+                  .map((expense) => ({
+                    label: expense.label,
+                    value: Number(expense.amount || 0),
+                    tag: expense.tag || 'Others',
+                  }));
 
                 if (!expenseEntryList.length) {
-                  return <div className="history-card"><h3>{expenseDate || 'No date selected'}</h3><p>No expenses added for this date.</p></div>;
+                  const selectedDayRecord = safeRecords.find((record) => record.date === expenseDate);
+                  const fallbackEntries = selectedDayRecord
+                    ? Object.values(selectedDayRecord.entries).filter(isExpenseEntry)
+                    : [];
+
+                  if (!fallbackEntries.length) {
+                    return <div className="history-card"><h3>{expenseDate || 'No date selected'}</h3><p>No expenses added for this date.</p></div>;
+                  }
+
+                  return (
+                    <div className="history-card">
+                      <h3>{expenseDate}</h3>
+                      <ul>
+                        {fallbackEntries.map((entry, index) => (
+                          <li key={`${expenseDate}-${entry.label}-${index}`}>
+                            <div>
+                              <span>{entry.label}</span>
+                              <small className="expense-tag-text">Tag: {displayExpenseTag(entry.tag || 'Others')}</small>
+                            </div>
+                            <strong>₹{Number(entry.value || 0).toFixed(2)}</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
                 }
 
                 return (
@@ -967,35 +1029,63 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
             </div>
 
             <div className="history-list">
-              {dayEntries
-                .filter((record) => record.date.startsWith(selectedMonth))
-                .map((record) => {
-                  const expenseEntries = Object.values(record.entries).filter(isExpenseEntry);
+              {(() => {
+                const monthExpenseEntries = safeExpenseDocs.filter((expense) => expense && expense.date && expense.date.startsWith(selectedMonth));
+                if (monthExpenseEntries.length) {
+                  return [...new Map(monthExpenseEntries.map((expense) => [expense.date, expense.date])).keys()].sort((a, b) => b.localeCompare(a)).map((date) => {
+                    const dailyExpenses = monthExpenseEntries.filter((expense) => expense.date === date);
+                    const dailyTotal = dailyExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
 
-                  if (!expenseEntries.length) {
-                    return null;
-                  }
+                    return (
+                      <div key={date} className="history-card">
+                        <h3>{date}</h3>
+                        <ul>
+                          {dailyExpenses.map((expense, index) => (
+                            <li key={`${date}-${expense.label}-${index}`}>
+                              <div>
+                                <span>{expense.label}</span>
+                                <small className="expense-tag-text">Tag: {displayExpenseTag(expense.tag || 'Others')}</small>
+                              </div>
+                              <strong>₹{Number(expense.amount || 0).toFixed(2)}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="daily-expense-total">Daily total: ₹{dailyTotal.toFixed(2)}</p>
+                      </div>
+                    );
+                  });
+                }
 
-                  const dailyTotal = expenseEntries.reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+                return dayEntries
+                  .filter((record) => record.date.startsWith(selectedMonth))
+                  .map((record) => {
+                    const expenseEntries = Object.values(record.entries).filter(isExpenseEntry);
 
-                  return (
-                    <div key={record.date} className="history-card">
-                      <h3>{record.date}</h3>
-                      <ul>
-                        {expenseEntries.map((entry, index) => (
-                          <li key={`${record.date}-${entry.label}-${index}`}>
-                            <div>
-                              <span>{entry.label}</span>
-                              <small className="expense-tag-text">Tag: {displayExpenseTag(entry.tag || 'Others')}</small>
-                            </div>
-                            <strong>₹{Number(entry.value || 0).toFixed(2)}</strong>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="daily-expense-total">Daily total: ₹{dailyTotal.toFixed(2)}</p>
-                    </div>
-                  );
-                })}
+                    if (!expenseEntries.length) {
+                      return null;
+                    }
+
+                    const dailyTotal = expenseEntries.reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+
+                    return (
+                      <div key={record.date} className="history-card">
+                        <h3>{record.date}</h3>
+                        <ul>
+                          {expenseEntries.map((entry, index) => (
+                            <li key={`${record.date}-${entry.label}-${index}`}>
+                              <div>
+                                <span>{entry.label}</span>
+                                <small className="expense-tag-text">Tag: {displayExpenseTag(entry.tag || 'Others')}</small>
+                              </div>
+                              <strong>₹{Number(entry.value || 0).toFixed(2)}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="daily-expense-total">Daily total: ₹{dailyTotal.toFixed(2)}</p>
+                      </div>
+                    );
+                  });
+              })()}
             </div>
           </section>
         )}
