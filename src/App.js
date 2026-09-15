@@ -896,6 +896,34 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
               </div>
             </div>
 
+            <div className="chart-section">
+              <h3>Expense by tag</h3>
+              <div className="expense-table-wrap">
+                <table className="expense-table">
+                  <thead>
+                    <tr>
+                      <th>Tag</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expenseByTag.length ? (
+                      expenseByTag.map(([tag, amount]) => (
+                        <tr key={tag}>
+                          <td>{tag}</td>
+                          <td>₹{amount.toFixed(2)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="2">No expense data yet</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <div className="history-list">
               {dayEntries
                 .filter((record) => record.date.startsWith(selectedMonth))
