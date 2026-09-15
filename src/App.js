@@ -60,6 +60,31 @@ const normalizeExpenseTag = (tag) => {
 const canonicalExpenseTag = (tag) => normalizeExpenseTag(tag).toLowerCase();
 const displayExpenseTag = (tag) => normalizeExpenseTag(tag || 'Others');
 
+const normalizeRecordEntries = (record) => {
+  if (!record || typeof record !== 'object' || !record.entries || typeof record.entries !== 'object') {
+    return record;
+  }
+
+  const normalizedEntries = Object.fromEntries(
+    Object.entries(record.entries).map(([key, entry]) => {
+      if (!entry || typeof entry !== 'object') return [key, entry];
+
+      if (entry.type === 'amount') {
+        return [key, { ...entry, tag: displayExpenseTag(entry.tag || 'Others') }];
+      }
+
+      return [key, entry];
+    })
+  );
+
+  return { ...record, entries: normalizedEntries };
+};
+
+const normalizeRecordList = (records) => {
+  if (!Array.isArray(records)) return [];
+  return records.map(normalizeRecordEntries);
+};
+
 const getWeekdayForDate = (dateStr) => {
   const safeDate = dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`;
   const date = new Date(safeDate);
@@ -95,7 +120,7 @@ function App() {
       if (!response.ok) throw new Error('Failed to fetch records');
       const data = await response.json();
       if (Array.isArray(data)) {
-        syncLocalRecords(data);
+        syncLocalRecords(normalizeRecordList(data));
       }
     } catch (error) {
       console.warn('Falling back to browser storage for records:', error.message);
@@ -214,7 +239,7 @@ function App() {
     };
 
     const filtered = safeRecords.filter((item) => item.date !== selectedDate);
-    const updatedRecords = [...filtered, payload].sort((a, b) => a.date.localeCompare(b.date));
+    const updatedRecords = [...filtered, normalizeRecordEntries(payload)].sort((a, b) => a.date.localeCompare(b.date));
     syncLocalRecords(updatedRecords);
     await saveRecordToMongo(payload);
     alert(`Saved successfully for ${selectedDate}`);
