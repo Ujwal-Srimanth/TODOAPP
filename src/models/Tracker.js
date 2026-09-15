@@ -10,6 +10,7 @@ const entrySchema = new mongoose.Schema(
       required: true,
     },
     value: mongoose.Schema.Types.Mixed,
+    tag: { type: String, default: 'Others' },
   },
   { _id: false }
 );

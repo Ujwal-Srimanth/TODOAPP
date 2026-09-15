@@ -52,6 +52,14 @@ const DEFAULT_EXPENSE_TAGS = [
 
 const DEFAULT_EVENT_IDS = new Set(DEFAULT_EVENTS.map((event) => event.id));
 
+const normalizeExpenseTag = (tag) => {
+  const value = String(tag ?? 'Others').trim().replace(/\s+/g, ' ');
+  return value || 'Others';
+};
+
+const canonicalExpenseTag = (tag) => normalizeExpenseTag(tag).toLowerCase();
+const displayExpenseTag = (tag) => normalizeExpenseTag(tag || 'Others');
+
 const getWeekdayForDate = (dateStr) => {
   const safeDate = dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`;
   const date = new Date(safeDate);
@@ -282,7 +290,7 @@ function App() {
     const expenseValue = Number(formData.get('expenseValue') || 0);
     const selectedTag = String(formData.get('expenseTag') || '').trim();
     const customTagValue = String(formData.get('customExpenseTag') || '').trim();
-    const finalTag = customTagValue || selectedTag || 'Others';
+    const finalTag = normalizeExpenseTag(customTagValue || selectedTag || 'Others');
 
     if (!inputExpenseDate || !expenseLabel || !Number.isFinite(expenseValue) || expenseValue <= 0) {
       return;
@@ -292,8 +300,10 @@ function App() {
 
     if (customTagValue) {
       setExpenseTags((previous) => {
-        const trimmed = customTagValue.trim();
-        if (!trimmed || previous.includes(trimmed)) return previous;
+        const trimmed = normalizeExpenseTag(customTagValue);
+        if (!trimmed || previous.some((tag) => canonicalExpenseTag(tag) === canonicalExpenseTag(trimmed))) {
+          return previous;
+        }
         return [...previous, trimmed];
       });
     }
@@ -365,12 +375,20 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
       Object.values(record.entries)
         .filter(isExpenseEntry)
         .forEach((entry) => {
-          const tag = entry.tag || 'Others';
-          map.set(tag, (map.get(tag) || 0) + Number(entry.value || 0));
+          const tag = displayExpenseTag(entry.tag || 'Others');
+          const key = canonicalExpenseTag(tag);
+
+          if (!map.has(key)) {
+            map.set(key, { label: tag, total: 0 });
+          }
+
+          const current = map.get(key);
+          current.total += Number(entry.value || 0);
+          map.set(key, current);
         });
     });
 
-    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+    return [...map.values()].sort((a, b) => b.total - a.total).map((item) => [item.label, item.total]);
   }, [monthRecords]);
 
   const maxExpenseTagValue = expenseByTag.length ? Math.max(...expenseByTag.map(([, value]) => value)) : 0;
@@ -826,7 +844,10 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
                     <ul>
                       {expenseEntryList.map((entry, index) => (
                         <li key={`${expenseDate}-${entry.label}-${index}`}>
-                          <span>{entry.label}</span>
+                          <div>
+                            <span>{entry.label}</span>
+                            <small className="expense-tag-text">Tag: {displayExpenseTag(entry.tag || 'Others')}</small>
+                          </div>
                           <strong>₹{Number(entry.value || 0).toFixed(2)}</strong>
                         </li>
                       ))}
@@ -881,7 +902,10 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
                       <ul>
                         {expenseEntries.map((entry, index) => (
                           <li key={`${record.date}-${entry.label}-${index}`}>
-                            <span>{entry.label}</span>
+                            <div>
+                              <span>{entry.label}</span>
+                              <small className="expense-tag-text">Tag: {displayExpenseTag(entry.tag || 'Others')}</small>
+                            </div>
                             <strong>₹{Number(entry.value || 0).toFixed(2)}</strong>
                           </li>
                         ))}
@@ -1087,53 +1111,6 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
               ) : (
                 <p>No weight data for this month yet.</p>
               )}
-
-              <h3>Expense by tag</h3>
-              <div className="expense-table-wrap">
-                <table className="expense-table">
-                  <thead>
-                    <tr>
-                      <th>Tag</th>
-                      <th>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenseByTag.length ? (
-                      expenseByTag.map(([tag, amount]) => (
-                        <tr key={tag}>
-                          <td>{tag}</td>
-                          <td>₹{amount.toFixed(2)}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="2">No expense data yet</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="bar-chart">
-                {expenseByTag.length ? (
-                  expenseByTag.map(([tag, amount]) => (
-                    <div key={tag} className="bar-row">
-                      <div className="bar-labels">
-                        <span>{tag}</span>
-                        <strong>₹{amount.toFixed(2)}</strong>
-                      </div>
-                      <div className="bar-track">
-                        <div
-                          className="bar-fill"
-                          style={{ width: `${maxExpenseTagValue ? (amount / maxExpenseTagValue) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p>No chart data yet</p>
-                )}
-              </div>
             </div>
 
             <div className="mini-list">

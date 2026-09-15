@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: linear-gradient(180deg, #f5f7ff 0%, #eef5ff 100%);
   color: #1f2937;
-  padding: 32px 24px 48px;
+  padding: 28px 18px 48px;
   box-sizing: border-box;
 }
 
@@ -10,10 +10,15 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   font-family: Inter, 'Segoe UI', sans-serif;
   background: #eef5ff;
+  color: #1f2937;
 }
 
 button,
@@ -23,13 +28,21 @@ textarea {
   font: inherit;
 }
 
+button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
 .topbar {
   max-width: 1200px;
-  margin: 0 auto 24px;
+  margin: 0 auto 28px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
   flex-wrap: wrap;
 }
 
@@ -53,6 +66,7 @@ textarea {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .nav-button {
@@ -65,6 +79,9 @@ textarea {
   font-weight: 700;
   transition: all 0.2s ease;
   min-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-button.active {
@@ -90,9 +107,9 @@ textarea {
 .panel-header {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-end;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
   flex-wrap: wrap;
 }
 
@@ -102,6 +119,7 @@ textarea {
   gap: 6px;
   color: #475569;
   font-size: 13px;
+  min-width: 180px;
 }
 
 .date-picker input,
@@ -114,10 +132,21 @@ textarea {
   font: inherit;
   background: white;
   width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .date-picker input {
   min-width: 170px;
+}
+
+.date-picker input:focus,
+.custom-event-form input:focus,
+.custom-event-form select:focus,
+.event-card input:focus,
+.event-card textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
 }
 
 .event-grid {
@@ -134,6 +163,8 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+  justify-content: space-between;
 }
 
 .disabled-card {
@@ -197,6 +228,7 @@ textarea {
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 12px;
+  align-items: center;
 }
 
 .form-row input {
@@ -216,6 +248,7 @@ textarea {
   border-radius: 12px;
   cursor: pointer;
   font-weight: 700;
+  min-height: 44px;
 }
 
 .export-button {
@@ -309,7 +342,8 @@ textarea {
   gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid #e2e8f0;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .history-card li:last-child,
@@ -317,12 +351,35 @@ textarea {
   border-bottom: none;
 }
 
-.history-card li span {
-  color: #334155;
+.history-card li > div,
+.mini-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 180px;
 }
 
-.history-card li strong {
+.history-card li span,
+.mini-list li span {
+  color: #334155;
+  line-height: 1.5;
+}
+
+.expense-tag-text {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history-card li strong,
+.mini-list li strong {
   color: #111827;
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .daily-expense-total {
@@ -360,6 +417,8 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 120px;
+  justify-content: space-between;
 }
 
 .summary-card span,
@@ -488,6 +547,12 @@ textarea {
 
   .form-row {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-row button,
+  .export-button {
+    width: 100%;
   }
 
   .history-card li {
@@ -540,5 +605,14 @@ textarea {
 
   .checkbox-row {
     font-size: 0.95rem;
+  }
+
+  .history-card li {
+    display: block;
+  }
+
+  .history-card li strong {
+    display: block;
+    margin-top: 8px;
   }
 }
