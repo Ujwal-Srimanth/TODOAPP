@@ -391,7 +391,18 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
     return [...map.values()].sort((a, b) => b.total - a.total).map((item) => [item.label, item.total]);
   }, [monthRecords]);
 
-  const maxExpenseTagValue = expenseByTag.length ? Math.max(...expenseByTag.map(([, value]) => value)) : 0;
+  const budgetLimit = 15000;
+  const monthlyExpenseStatus = (() => {
+    if (totalExpense < 10000) return 'low';
+    if (totalExpense <= budgetLimit) return 'medium';
+    return 'high';
+  })();
+
+  const monthlyExpenseStatusText = (() => {
+    if (monthlyExpenseStatus === 'low') return 'Below budget';
+    if (monthlyExpenseStatus === 'medium') return 'Near budget';
+    return 'Over budget';
+  })();
 
   const waterTotal = monthRecords.reduce((sum, record) => {
     const value = Number(record.entries.water?.value || 0);
@@ -878,9 +889,10 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
             </div>
 
             <div className="stat-cards">
-              <div className="stat-card accent">
+              <div className={`stat-card accent budget-status-${monthlyExpenseStatus}`}>
                 <span>Total spend</span>
-                <strong>₹{totalExpense.toFixed(2)}</strong>
+                <strong>₹{totalExpense.toFixed(2)} / ₹{budgetLimit.toLocaleString()}</strong>
+                <small>{monthlyExpenseStatusText}</small>
               </div>
             </div>
 
@@ -1070,9 +1082,10 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
                 <span>Start vs today</span>
                 <strong className={monthWeightDeltaClass === 'gain' ? 'trend-positive' : monthWeightDeltaClass === 'loss' ? 'trend-negative' : ''}>{monthWeightDeltaText}</strong>
               </div>
-              <div className="stat-card accent">
+              <div className={`stat-card accent budget-status-${monthlyExpenseStatus}`}>
                 <span>Expense total</span>
-                <strong>₹{totalExpense.toFixed(2)}</strong>
+                <strong>₹{totalExpense.toFixed(2)} / ₹{budgetLimit.toLocaleString()}</strong>
+                <small>{monthlyExpenseStatusText}</small>
               </div>
             </div>
 
