@@ -50,8 +50,6 @@ const DEFAULT_EXPENSE_TAGS = [
   'Others',
 ];
 
-const DEFAULT_EVENT_IDS = new Set(DEFAULT_EVENTS.map((event) => event.id));
-
 const normalizeExpenseTag = (tag) => {
   const value = String(tag ?? 'Others').trim().replace(/\s+/g, ' ');
   return value || 'Others';
@@ -205,21 +203,6 @@ function App() {
     setDraftEntries(currentRecord.entries || {});
   }, [selectedDate, currentRecord.entries]);
 
-  const getDefaultEntryFallbacks = (date) => {
-    const monthPrefix = date.slice(0, 7);
-    const sameMonthRecords = safeRecords.filter((item) => item.date.startsWith(monthPrefix));
-    const monthDefaults = sameMonthRecords.reduce((acc, record) => {
-      Object.entries(record.entries).forEach(([key, entry]) => {
-        if (DEFAULT_EVENT_IDS.has(key)) {
-          acc[key] = entry;
-        }
-      });
-      return acc;
-    }, {});
-
-    return monthDefaults;
-  };
-
   const saveRecordToMongo = async (recordPayload) => {
     try {
       const response = await fetch(`${API_BASE}/records`, {
@@ -260,10 +243,7 @@ function App() {
   const submitDailyRecord = async () => {
     const payload = {
       date: selectedDate,
-      entries: {
-        ...getDefaultEntryFallbacks(selectedDate),
-        ...draftEntries,
-      },
+      entries: draftEntries,
     };
 
     const filtered = safeRecords.filter((item) => item.date !== selectedDate);
