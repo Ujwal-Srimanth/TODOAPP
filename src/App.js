@@ -60,6 +60,15 @@ const normalizeExpenseTag = (tag) => {
 const canonicalExpenseTag = (tag) => normalizeExpenseTag(tag).toLowerCase();
 const displayExpenseTag = (tag) => normalizeExpenseTag(tag || 'Others');
 
+const normalizeCustomEvent = (event) => {
+  if (!event || typeof event !== 'object') return null;
+
+  const label = String(event.label ?? '').trim();
+  const fallbackId = label ? label.toLowerCase().replace(/\s+/g, '-') : event._id;
+  const id = String(event.id || fallbackId || '');
+  return id ? { ...event, id } : null;
+};
+
 const normalizeRecordEntries = (record) => {
   if (!record || typeof record !== 'object' || !record.entries || typeof record.entries !== 'object') {
     return record;
@@ -171,7 +180,10 @@ function App() {
     }
   }, []);
 
-  const safeCustomEvents = useMemo(() => (Array.isArray(customEvents) ? customEvents : []), [customEvents]);
+  const safeCustomEvents = useMemo(
+    () => (Array.isArray(customEvents) ? customEvents.map(normalizeCustomEvent).filter(Boolean) : []),
+    [customEvents]
+  );
   const safeRecords = useMemo(() => (Array.isArray(records) ? records : []), [records]);
   const safeExpenseDocs = useMemo(() => (Array.isArray(expenseDocs) ? expenseDocs : []), [expenseDocs]);
 
