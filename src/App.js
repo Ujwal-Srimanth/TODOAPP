@@ -194,6 +194,16 @@ function App() {
     () => new Set(allEvents.map((event) => event.id)),
     [allEvents]
   );
+  const recurringEventsById = useMemo(
+    () => new Map([...DEFAULT_EVENTS, ...safeCustomEvents].map((event) => [event.id, event])),
+    [safeCustomEvents]
+  );
+  const filterEntriesForDate = (entries, date) => Object.fromEntries(
+    Object.entries(entries || {}).filter(([eventId]) => {
+      const event = recurringEventsById.get(eventId);
+      return !event || eventMatchesRecurrence(event, date);
+    })
+  );
 
   const currentRecord = useMemo(() => {
     return safeRecords.find((item) => item.date === selectedDate) || { date: selectedDate, entries: {} };
@@ -243,7 +253,7 @@ function App() {
   const submitDailyRecord = async () => {
     const payload = {
       date: selectedDate,
-      entries: draftEntries,
+      entries: filterEntriesForDate(draftEntries, selectedDate),
     };
 
     const filtered = safeRecords.filter((item) => item.date !== selectedDate);
@@ -1097,7 +1107,8 @@ const monthRecords = safeRecords.filter((item) => item.date.startsWith(selectedM
             <div className="history-list">
               {dayEntries
                 .map((record) => {
-                  const visibleEntries = Object.values(record.entries).filter((entry) => entry.type !== 'amount');
+                  const visibleEntries = Object.values(filterEntriesForDate(record.entries, record.date))
+                    .filter((entry) => entry.type !== 'amount');
 
                   if (!visibleEntries.length) {
                     return null;

@@ -49,7 +49,10 @@ test('does not carry yesterday checkbox values into today', async () => {
           },
           {
             date: '2026-10-15',
-            entries: { tablet1: { label: 'Tablet 1', type: 'checkbox', value: true } },
+            entries: {
+              tablet1: { label: 'Tablet 1', type: 'checkbox', value: true },
+              capsule2: { label: 'Capsule 2', type: 'checkbox', value: true },
+            },
           },
         ]
         : []),
@@ -58,6 +61,11 @@ test('does not carry yesterday checkbox values into today', async () => {
 
   const { container } = render(<App />);
   await screen.findByText(/daily tracker/i);
+  fireEvent.click(screen.getByRole('button', { name: 'History' }));
+  const thursdayHistoryCard = (await screen.findByRole('heading', { name: '2026-10-15' })).closest('.history-card');
+  expect(thursdayHistoryCard).not.toHaveTextContent('Capsule 2');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Checklist' }));
   fireEvent.change(container.querySelector('input[type="date"]'), { target: { value: '2026-10-15' } });
 
   const tabletOneCard = screen.getByText('Tablet 1', { selector: 'strong' }).closest('.event-card');
@@ -69,4 +77,5 @@ test('does not carry yesterday checkbox values into today', async () => {
   expect(savedPayload.entries.tablet1.value).toBe(false);
   expect(savedPayload.entries.tablet2).toBeUndefined();
   expect(savedPayload.entries.capsule1).toBeUndefined();
+  expect(savedPayload.entries.capsule2).toBeUndefined();
 });
